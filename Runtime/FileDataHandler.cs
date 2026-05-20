@@ -177,7 +177,7 @@ namespace SaveSystem
                 try
                 {
                     await using FileStream stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
-                    using StreamReader reader = new StreamReader(stream);
+                    await using StreamReader reader = new StreamReader(stream);
 
                     string dataToLoad = await reader.ReadToEndAsync();
                     loadedData = JsonUtility.FromJson<T>(dataToLoad);
@@ -187,6 +187,10 @@ namespace SaveSystem
                     Debug.LogError($"Error while loading data from file: {fullPath} \n {e}");
                     throw;
                 }
+            }
+            else
+            {
+                Debug.LogWarning($"[LoadAsync] No save file found at: {fullPath}");
             }
 
             return loadedData;
