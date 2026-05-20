@@ -88,7 +88,7 @@ namespace SaveSystem
 
             if (currentData == null)
             {
-                Debug.LogWarning("[DataManager] No save file found. Initializing to defaults.");
+                Debug.LogWarning($"[DataManager] No save file found at {dirPath}. Initializing to defaults.");
                 NewGame();
             }
 
