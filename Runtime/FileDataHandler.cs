@@ -153,7 +153,7 @@ namespace SaveSystem
                 throw;
             }
         }
-        
+
         /// <summary>
         /// Asynchronously reads and deserializes data from disk.
         /// Falls back to the synchronous path when using PlayerPrefs, as it has no async API.
@@ -165,35 +165,27 @@ namespace SaveSystem
         {
             if (usePlayerPrefs)
             {
-                // PlayerPrefs has no async API.
                 return Load(true);
             }
 
             string fullPath = Path.Combine(dataDirPath, dataFileName);
-            T loadedData = null;
 
-            if (File.Exists(fullPath))
-            {
-                try
-                {
-                    await using FileStream stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
-                    await using StreamReader reader = new StreamReader(stream);
-
-                    string dataToLoad = await reader.ReadToEndAsync();
-                    loadedData = JsonUtility.FromJson<T>(dataToLoad);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"Error while loading data from file: {fullPath} \n {e}");
-                    throw;
-                }
-            }
-            else
+            if (!File.Exists(fullPath))
             {
                 Debug.LogWarning($"[LoadAsync] No save file found at: {fullPath}");
+                return null;
             }
 
-            return loadedData;
+            try
+            {
+                string dataToLoad = await File.ReadAllTextAsync(fullPath);
+                return JsonUtility.FromJson<T>(dataToLoad);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[LoadAsync] Error while loading data from file: {fullPath}\n{e}");
+                throw;
+            }
         }
     }
 }
