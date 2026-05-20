@@ -12,6 +12,7 @@ namespace SaveSystem
     /// </summary>
     public class DataManager<T> where T : SaveData, new()
     {
+        private readonly string dirPath;
         private readonly string fileName;
         private readonly bool usePlayerPrefs;
         private readonly FileDataHandler<T> dataHandler;
@@ -24,12 +25,13 @@ namespace SaveSystem
         /// </summary>
         public T CurrentData => currentData;
 
-        public DataManager(string fileName = "saveData.json", bool usePlayerPrefs = false)
+        public DataManager(string dirPath, string fileName = "saveData.json", bool usePlayerPrefs = false)
         {
+            this.dirPath = dirPath;
             this.fileName = fileName;
             this.usePlayerPrefs = usePlayerPrefs;
 
-            dataHandler = new FileDataHandler<T>(Application.persistentDataPath, this.fileName);
+            dataHandler = new FileDataHandler<T>(this.dirPath, this.fileName);
         }
 
         /// <summary>
