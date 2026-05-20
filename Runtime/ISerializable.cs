@@ -4,7 +4,7 @@ namespace SaveSystem
 {
     public interface ISerializable
     {
-        void LoadData(GameData data);
-        void SaveData(GameData data);
+        void LoadData(SaveData data);
+        void SaveData(SaveData data);
     }
 }
