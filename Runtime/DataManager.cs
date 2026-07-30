@@ -217,7 +217,7 @@ namespace SaveSystem
 
             serializableObjects.UnionWith(serializables);
             
-            Debug.Log($"[DataManager] Found {serializables.Count} serializable objects.");
+            Debug.Log($"[DataManager] Found {serializables.Length} serializable objects.");
         }
 
         /// <summary>
@@ -225,7 +225,7 @@ namespace SaveSystem
         /// </summary>
         private void CleanupDestroyedObjects()
         {
-            serializableObjects.RemoveAll(obj => obj == null || (obj as MonoBehaviour) == null);
+            serializableObjects.RemoveWhere(obj => obj == null || obj is MonoBehaviour mb && mb == null);
         }
     }
 }
