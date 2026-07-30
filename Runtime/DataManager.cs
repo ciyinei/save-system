@@ -213,7 +213,8 @@ namespace SaveSystem
             var serializables = Object.FindObjectsByType<MonoBehaviour>(
                             FindObjectsInactive.Include,
                             FindObjectsSortMode.InstanceID)
-                    .OfType<ISerializable>();
+                    .OfType<ISerializable>()
+                    .ToArray();
 
             serializableObjects.UnionWith(serializables);
             
