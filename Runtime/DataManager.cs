@@ -148,6 +148,26 @@ namespace SaveSystem
                 saveable?.LoadData(currentData);
             }
         }
+        
+        /// <summary>
+        /// Calls <see cref="ISerializable.SaveData"/> on all registered serializable objects,
+        /// collecting their state into <see cref="CurrentData"/> before writing to disk.
+        /// </summary>
+        /// <param name="clearDestroyed">
+        /// If true, purges destroyed objects from the list before collecting data.
+        /// </param>
+        private void PrepareDataForSaving(bool clearDestroyed)
+        {
+            if (clearDestroyed)
+            {
+                CleanupDestroyedObjects();
+            }
+
+            foreach (var serializable in serializableObjects)
+            {
+                serializable?.SaveData(currentData);
+            }
+        }
 
         /// <summary>
         /// Ensures save data exists before collecting or writing data.
