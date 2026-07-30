@@ -45,9 +45,9 @@ namespace SaveSystem
         }
 
         /// <summary>
-        /// Synchronously loads game data from disk and applies it to all
+        /// Synchronously loads game data from disk or PlayerPrefs and applies it to all
         /// <see cref="ISerializable"/> objects in the scene.
-        /// Prefer <see cref="LoadGameAsync"/> to avoid blocking the main thread.
+        /// Prefer <see cref="LoadAsync"/> to avoid blocking the main thread.
         /// </summary>
         public void Load(bool scanScene = false)
         {
@@ -69,14 +69,19 @@ namespace SaveSystem
 
         /// <summary>
         /// Synchronously collects data from all <see cref="ISerializable"/> objects
-        /// and writes it to disk.
-        /// Prefer <see cref="SaveGameAsync"/> to avoid blocking the main thread.
+        /// and writes it to disk or PlayerPrefs.
+        /// Prefer <see cref="SaveAsync"/> to avoid blocking the main thread.
         /// </summary>
+        /// <param name="scanScene">
+        /// If true, scans the current scene before saving.
+        /// </param>
         /// <param name="clearDestroyed">
         /// If true, removes any destroyed objects from the serializable list before saving.
         /// </param>
         public void Save(bool scanScene = false, bool clearDestroyed = false)
         {
+            EnsureCurrentData();
+        
             if (scanScene)
             {
                 FindAllSerializableObjects();
@@ -87,9 +92,9 @@ namespace SaveSystem
         }
 
         /// <summary>
-        /// Asynchronously loads game data from disk and applies it to all
+        /// Asynchronously loads game data from disk or PlayerPrefs and applies it to all
         /// <see cref="ISerializable"/> objects in the scene.
-        /// Data is applied on the main thread to allow safe access to Unity components.
+        /// Data is applied on the main thread after loading completes.
         /// </summary>
         public async Task LoadAsync(bool scanScene = false)
         {
@@ -111,13 +116,18 @@ namespace SaveSystem
 
         /// <summary>
         /// Asynchronously collects data from all <see cref="ISerializable"/> objects
-        /// and writes it to disk.
+        /// and writes it to disk or PlayerPrefs.
         /// </summary>
+        /// <param name="scanScene">
+        /// If true, scans the current scene before saving.
+        /// </param>
         /// <param name="clearDestroyed">
         /// If true, removes any destroyed objects from the serializable list before saving.
         /// </param>
         public async Task SaveAsync(bool scanScene = false, bool clearDestroyed = false)
         {
+            EnsureCurrentData();
+        
             if (scanScene)
             {
                 FindAllSerializableObjects();
@@ -140,23 +150,11 @@ namespace SaveSystem
         }
 
         /// <summary>
-        /// Calls <see cref="ISerializable.SaveData"/> on all registered serializable objects,
-        /// collecting their state into <see cref="CurrentData"/> before writing to disk.
+        /// Ensures save data exists before collecting or writing data.
         /// </summary>
-        /// <param name="clearDestroyed">
-        /// If true, purges destroyed objects from the list before collecting data.
-        /// </param>
-        private void PrepareDataForSaving(bool clearDestroyed)
+        private void EnsureCurrentData()
         {
-            if (clearDestroyed)
-            {
-                CleanupDestroyedObjects();
-            }
-
-            foreach (var serializable in serializableObjects)
-            {
-                serializable?.SaveData(currentData);
-            }
+            currentData ??= new T();
         }
 
         /// <summary>
@@ -164,7 +162,24 @@ namespace SaveSystem
         /// Use this for objects that are spawned at runtime and may not be found by
         /// <see cref="FindAllSerializableObjects"/>.
         /// </summary>
-        public void AddSerializableObject(ISerializable serializable) => serializableObjects.Add(serializable);
+        public void AddSerializableObject(ISerializable serializable)
+        {
+            if (serializable != null)
+            {
+                serializableObjects.Add(serializable);
+            }
+        }
+        
+        /// <summary>
+        /// Manually unregisters an <see cref="ISerializable"/> object from the manager.
+        /// </summary>
+        public void RemoveSerializableObject(ISerializable serializable)
+        {
+            if (serializable != null)
+            {
+                serializableObjects.Remove(serializable);
+            }
+        }
 
         /// <summary>
         /// Scans the scene for all <see cref="MonoBehaviour"/> instances that implement
