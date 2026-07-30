@@ -12,13 +12,13 @@ namespace SaveSystem
     /// </summary>
     public class DataManager<T> where T : SaveData, new()
     {
-        private readonly string dirPath;
-        private readonly string fileName;
-        private readonly bool usePlayerPrefs;
-        private readonly FileDataHandler<T> dataHandler;
+        readonly string dirPath;
+        readonly string fileName;
+        readonly bool usePlayerPrefs;
+        readonly FileDataHandler<T> dataHandler;
+        readonly HashSet<ISerializable> serializableObjects = new();
 
-        private T currentData;
-        private List<ISerializable> serializableObjects = new();
+        T currentData;
 
         /// <summary>
         /// The current save data loaded in memory.
@@ -38,9 +38,10 @@ namespace SaveSystem
         /// Resets save data to its default values.
         /// Called automatically when no saved data is found on load.
         /// </summary>
-        public void NewGame()
+        public void NewFileSave()
         {
             currentData = new T();
+            serializableObjects.Clear();
         }
 
         /// <summary>
@@ -48,7 +49,7 @@ namespace SaveSystem
         /// <see cref="ISerializable"/> objects in the scene.
         /// Prefer <see cref="LoadGameAsync"/> to avoid blocking the main thread.
         /// </summary>
-        public void LoadGame()
+        public void Load(bool scanScene = false)
         {
             currentData = dataHandler.Load(usePlayerPrefs);
 
@@ -58,7 +59,11 @@ namespace SaveSystem
                 NewGame();
             }
 
-            serializableObjects = FindAllSerializableObjects();
+            if (scanScene)
+            {
+                FindAllSerializableObjects();
+            }
+            
             ApplyDataToObjects();
         }
 
@@ -70,9 +75,13 @@ namespace SaveSystem
         /// <param name="clearDestroyed">
         /// If true, removes any destroyed objects from the serializable list before saving.
         /// </param>
-        public void SaveGame(bool clearDestroyed = false)
+        public void Save(bool scanScene = false, bool clearDestroyed = false)
         {
-            serializableObjects = FindAllSerializableObjects();
+            if (scanScene)
+            {
+                FindAllSerializableObjects();
+            }
+            
             PrepareDataForSaving(clearDestroyed);
             dataHandler.Save(currentData, usePlayerPrefs);
         }
@@ -82,7 +91,7 @@ namespace SaveSystem
         /// <see cref="ISerializable"/> objects in the scene.
         /// Data is applied on the main thread to allow safe access to Unity components.
         /// </summary>
-        public async Task LoadGameAsync()
+        public async Task LoadAsync(bool scanScene = false)
         {
             currentData = await dataHandler.LoadAsync(usePlayerPrefs);
 
@@ -92,7 +101,11 @@ namespace SaveSystem
                 NewGame();
             }
 
-            serializableObjects = FindAllSerializableObjects();
+            if (scanScene)
+            {
+                FindAllSerializableObjects();
+            }
+            
             ApplyDataToObjects();
         }
 
@@ -103,9 +116,13 @@ namespace SaveSystem
         /// <param name="clearDestroyed">
         /// If true, removes any destroyed objects from the serializable list before saving.
         /// </param>
-        public async Task SaveGameAsync(bool clearDestroyed = false)
+        public async Task SaveAsync(bool scanScene = false, bool clearDestroyed = false)
         {
-            serializableObjects = FindAllSerializableObjects();
+            if (scanScene)
+            {
+                FindAllSerializableObjects();
+            }
+            
             PrepareDataForSaving(clearDestroyed);
             await dataHandler.SaveAsync(currentData, usePlayerPrefs);
         }
@@ -118,7 +135,7 @@ namespace SaveSystem
         {
             foreach (var saveable in serializableObjects)
             {
-                saveable.LoadData(currentData);
+                saveable?.LoadData(currentData);
             }
         }
 
@@ -138,7 +155,7 @@ namespace SaveSystem
 
             foreach (var serializable in serializableObjects)
             {
-                serializable.SaveData(currentData);
+                serializable?.SaveData(currentData);
             }
         }
 
@@ -156,17 +173,16 @@ namespace SaveSystem
         /// via <see cref="Object.FindObjectsByType{T}"/>. Ensure it is only instantiated
         /// in a Unity context.
         /// </summary>
-        private List<ISerializable> FindAllSerializableObjects()
+        private void FindAllSerializableObjects()
         {
             var serializables = Object.FindObjectsByType<MonoBehaviour>(
                             FindObjectsInactive.Include,
                             FindObjectsSortMode.InstanceID)
-                    .OfType<ISerializable>()
-                    .ToList();
+                    .OfType<ISerializable>();
 
+            serializableObjects.UnionWith(serializables);
+            
             Debug.Log($"[DataManager] Found {serializables.Count} serializable objects.");
-
-            return serializables;
         }
 
         /// <summary>

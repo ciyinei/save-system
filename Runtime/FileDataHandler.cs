@@ -12,8 +12,8 @@ namespace SaveSystem
     /// <typeparam name="T">The type of data to serialize. Must be a class.</typeparam>
     public class FileDataHandler<T> where T : class
     {
-        private readonly string dataDirPath;
-        private readonly string dataFileName;
+        readonly string dataDirPath;
+        readonly string dataFileName;
 
         /// <summary>
         /// Creates a new handler targeting a specific directory and file name.
