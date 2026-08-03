@@ -41,7 +41,6 @@ namespace SaveSystem
         public void NewFileSave()
         {
             currentData = new T();
-            serializableObjects.Clear();
         }
 
         /// <summary>
