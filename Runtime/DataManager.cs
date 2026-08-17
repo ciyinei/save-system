@@ -21,9 +21,24 @@ namespace SaveSystem
         T currentData;
 
         /// <summary>
-        /// The current save data loaded in memory.
+        /// True once <see cref="currentData"/> reflects either a successful load from disk
+        /// or an explicit <see cref="NewFileSave"/>. Guards <see cref="Save"/>/<see cref="SaveAsync"/>
+        /// against writing fabricated blank data over a real save file — e.g. if a save is
+        /// triggered (app pause/quit, an exception elsewhere) before load has completed.
+        /// </summary>
+        bool hasLoaded = false;
+
+        /// <summary>
+        /// The current save data loaded in memory. May be null if no load or new-file-save
+        /// has happened yet — check <see cref="HasLoaded"/> before relying on this being populated.
         /// </summary>
         public T CurrentData => currentData;
+
+        /// <summary>
+        /// True once save data is safely established in memory (via successful load or
+        /// explicit new-file-save) and it is safe to call <see cref="Save"/>/<see cref="SaveAsync"/>.
+        /// </summary>
+        public bool HasLoaded => hasLoaded;
 
         public DataManager(string dirPath, string fileName = "saveData.json", bool usePlayerPrefs = false)
         {
@@ -35,12 +50,14 @@ namespace SaveSystem
         }
 
         /// <summary>
-        /// Resets save data to its default values.
-        /// Called automatically when no saved data is found on load.
+        /// Resets save data to its default values. This is the only path that should
+        /// produce a blank <see cref="CurrentData"/> — call it explicitly when the player
+        /// starts a new game, not as an implicit fallback during save.
         /// </summary>
         public void NewFileSave()
         {
             currentData = new T();
+            hasLoaded = true;
         }
 
         /// <summary>
@@ -54,15 +71,25 @@ namespace SaveSystem
 
             if (currentData == null)
             {
+                // NOTE: FileDataHandler currently collapses "no file found" and
+                // "file found but failed to parse/corrupted" into the same null result.
+                // If you add a status-aware Load to FileDataHandler later, a corrupted
+                // file should NOT fall through to NewFileSave() here — it should leave
+                // hasLoaded false so Save() refuses to run and the game can surface a
+                // recovery/error flow instead of silently destroying the corrupted file.
                 Debug.LogWarning("[DataManager] No save file found. Initializing to defaults.");
                 NewFileSave();
+            }
+            else
+            {
+                hasLoaded = true;
             }
 
             if (scanScene)
             {
                 FindAllSerializableObjects();
             }
-            
+
             ApplyDataToObjects();
         }
 
@@ -70,6 +97,8 @@ namespace SaveSystem
         /// Synchronously collects data from all <see cref="ISerializable"/> objects
         /// and writes it to disk or PlayerPrefs.
         /// Prefer <see cref="SaveAsync"/> to avoid blocking the main thread.
+        /// Does nothing (and logs an error) if called before data has been loaded or
+        /// initialized, to avoid overwriting an existing save with blank data.
         /// </summary>
         /// <param name="scanScene">
         /// If true, scans the current scene before saving.
@@ -79,13 +108,17 @@ namespace SaveSystem
         /// </param>
         public void Save(bool scanScene = false, bool clearDestroyed = false)
         {
-            EnsureCurrentData();
-        
+            if (!hasLoaded)
+            {
+                Debug.LogError("[DataManager] Save() called before data was loaded or initialized — aborting to avoid overwriting the save file with blank data.");
+                return;
+            }
+
             if (scanScene)
             {
                 FindAllSerializableObjects();
             }
-            
+
             PrepareDataForSaving(clearDestroyed);
             dataHandler.Save(currentData, usePlayerPrefs);
         }
@@ -104,18 +137,24 @@ namespace SaveSystem
                 Debug.LogWarning($"[DataManager] No save file found at {dirPath}. Initializing to defaults.");
                 NewFileSave();
             }
+            else
+            {
+                hasLoaded = true;
+            }
 
             if (scanScene)
             {
                 FindAllSerializableObjects();
             }
-            
+
             ApplyDataToObjects();
         }
 
         /// <summary>
         /// Asynchronously collects data from all <see cref="ISerializable"/> objects
         /// and writes it to disk or PlayerPrefs.
+        /// Does nothing (and logs an error) if called before data has been loaded or
+        /// initialized, to avoid overwriting an existing save with blank data.
         /// </summary>
         /// <param name="scanScene">
         /// If true, scans the current scene before saving.
@@ -125,13 +164,17 @@ namespace SaveSystem
         /// </param>
         public async Task SaveAsync(bool scanScene = false, bool clearDestroyed = false)
         {
-            EnsureCurrentData();
-        
+            if (!hasLoaded)
+            {
+                Debug.LogError("[DataManager] SaveAsync() called before data was loaded or initialized — aborting to avoid overwriting the save file with blank data.");
+                return;
+            }
+
             if (scanScene)
             {
                 FindAllSerializableObjects();
             }
-            
+
             PrepareDataForSaving(clearDestroyed);
             await dataHandler.SaveAsync(currentData, usePlayerPrefs);
         }
@@ -147,7 +190,7 @@ namespace SaveSystem
                 saveable?.LoadData(currentData);
             }
         }
-        
+
         /// <summary>
         /// Calls <see cref="ISerializable.SaveData"/> on all registered serializable objects,
         /// collecting their state into <see cref="CurrentData"/> before writing to disk.
@@ -169,14 +212,6 @@ namespace SaveSystem
         }
 
         /// <summary>
-        /// Ensures save data exists before collecting or writing data.
-        /// </summary>
-        private void EnsureCurrentData()
-        {
-            currentData ??= new T();
-        }
-
-        /// <summary>
         /// Manually registers an <see cref="ISerializable"/> object with the manager.
         /// Use this for objects that are spawned at runtime and may not be found by
         /// <see cref="FindAllSerializableObjects"/>.
@@ -188,7 +223,7 @@ namespace SaveSystem
                 serializableObjects.Add(serializable);
             }
         }
-        
+
         /// <summary>
         /// Manually unregisters an <see cref="ISerializable"/> object from the manager.
         /// </summary>
@@ -216,7 +251,7 @@ namespace SaveSystem
                     .ToArray();
 
             serializableObjects.UnionWith(serializables);
-            
+
             Debug.Log($"[DataManager] Found {serializables.Length} serializable objects.");
         }
 
